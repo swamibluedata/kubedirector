@@ -1,0 +1,128 @@
+{
+    "apiVersion": "kubedirector.bluedata.io/v1alpha1",
+    "kind": "KubeDirectorApp",
+    "metadata": {
+        "name": "python-ml"
+    },
+    "spec": {
+        "systemdRequired": true,
+        "config": {
+            "config_meta" : {
+                "ml_engine" : "python"
+            },
+            "selected_roles": [
+                "gunicorn",
+                "reqhandler"
+            ],
+            "role_services": [
+                {
+                    "role_id": "gunicorn",
+                    "service_ids": [
+                        "gunicorn",
+                        "ssh"
+                    ]
+                },
+                {
+                    "role_id": "reqhandler",
+                    "service_ids": [
+                        "gunicorn",
+                        "haproxy",
+                        "haproxystats"
+                    ]
+                },
+                {
+                    "role_id": "worker",
+                    "service_ids": [
+                        "ssh"
+                    ]
+                }
+            ]
+        },
+        "label": {
+            "name": "Python Tensorflow keras and Sckikitlearn data science.",
+            "description": "Python Tensorflow keras and Sckikitlearn data science. Generic model training/serving API wrapper"
+        },
+        "distro_id": "python-ml",
+        "version": "1.1",
+        "config_schema_version": 7,
+        "services": [
+            {
+                "id": "haproxystats",
+                "label": {
+                    "name": "Model serving request balancer stats"
+                },
+                "endpoint": {
+                    "url_scheme": "http",
+                    "port": 8081,
+                    "is_dashboard": true
+                }
+            },
+            {
+                "id": "ssh",
+                "label": {
+                    "name": "SSH"
+                },
+                "endpoint": {
+                    "port": 22,
+                    "is_dashboard": false
+                }
+            },
+            {
+                "exported_service": "AIML/Training",
+                "endpoint": {
+                    "url_scheme": "http",
+                    "path": "/train",
+                    "is_dashboard": false,
+                    "port": 10001
+                },
+                "id": "gunicorn",
+                "label": {
+                    "name": "Training Server"
+                }
+            },
+            {
+                "exported_service": "AIML/Deployment",
+                "endpoint": {
+                    "url_scheme": "http",
+                    "path": "/predict",
+                    "is_dashboard": false,
+                    "port": 32700
+                },
+                "id": "haproxy",
+                "label": {
+                    "name": "Model serving loadbalancer"
+                }
+            }
+        ],
+        "categories": [
+            "AIML/Deployment",
+            "AIML/Training"
+        ],
+        "roles": [
+            {
+                "image_repo_tag" : "docker.io/bluedata/flask_serving:1.0",
+                "config_package" : {
+                    "package_url": "https://s3.amazonaws.com/bluek8s/kubedirector/flask_serving/flask_configure.tgz"
+                },
+                "id": "gunicorn",
+                "cardinality": "1+"
+            },
+            {
+                "image_repo_tag": "docker.io/bluedata/flask_serving:1.0",
+                "config_package": {
+                    "package_url": "https://s3.amazonaws.com/bluek8s/kubedirector/flask_serving/flask_configure.tgz"
+                },
+                "id": "reqhandler",
+                "cardinality": "1"
+            },
+            {
+                "image_repo_tag": "docker.io/bluedata/sklearn:1.0",
+                "config_package": {
+                    "package_url": "https://s3.amazonaws.com/bluek8s/kubedirector/scikit/appconfig.tgz"
+                },
+                "cardinality": "1+",
+                "id": "worker"
+            }
+        ]
+    }
+}

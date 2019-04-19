@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	kdv1 "github.com/bluek8s/kubedirector/pkg/apis/kubedirector.bluedata.io/v1alpha1"
+	"github.com/bluek8s/kubedirector/pkg/observer"
 	"github.com/bluek8s/kubedirector/pkg/shared"
 	"k8s.io/api/core/v1"
 )
@@ -30,12 +31,18 @@ import (
 func allServiceRefkeys(
 	roleNames []string,
 	serviceName string,
+	attachedClusterName string,
 ) refkeysMap {
 
 	result := make(refkeysMap)
 	for _, r := range roleNames {
+		var refKeys []string
+		if attachedClusterName != "" {
+			refKeys = []string{"attachments", "clusters", attachedClusterName}
+		}
+		refKeys = append(refKeys, "nodegroups", "1", "roles", r, "services", serviceName)
 		result[r] = refkeys{
-			BdvlibRefKey: []string{"nodegroups", "1", "roles", r, "services", serviceName},
+			BdvlibRefKey: refKeys,
 		}
 	}
 	return result
@@ -47,6 +54,7 @@ func allServiceRefkeys(
 func getServices(
 	appCR *kdv1.KubeDirectorApp,
 	membersForRole map[string][]*kdv1.MemberStatus,
+	attachedClusterName string,
 ) map[string]ngRefkeysMap {
 
 	result := make(map[string]ngRefkeysMap)
@@ -62,7 +70,7 @@ func getServices(
 		}
 		if len(activeRoleNames) > 0 {
 			result[service.ID] = ngRefkeysMap{
-				"1": allServiceRefkeys(activeRoleNames, service.ID),
+				"1": allServiceRefkeys(activeRoleNames, service.ID, attachedClusterName),
 			}
 		}
 	}
@@ -76,6 +84,8 @@ func servicesForRole(
 	appCR *kdv1.KubeDirectorApp,
 	roleName string,
 	members []*kdv1.MemberStatus,
+	attachedClusterName string,
+	domain string,
 ) map[string]service {
 
 	result := make(map[string]service)
@@ -89,8 +99,9 @@ func servicesForRole(
 					for _, m := range members {
 						nodeName := m.Pod
 						endpoint := serviceDef.Endpoint.URLScheme
-						endpoint += "://" + nodeName
+						endpoint += "://" + nodeName + "." + domain
 						endpoint += ":" + strconv.Itoa(int(*(serviceDef.Endpoint.Port)))
+						endpoint += serviceDef.Endpoint.Path
 						endpoints = append(endpoints, endpoint)
 					}
 				}
@@ -105,8 +116,19 @@ func servicesForRole(
 					FQDNs: refkeys{
 						BdvlibRefKey: []string{"nodegroups", "1", "roles", roleName, "fqdns"},
 					},
-					ExportedService: "", // currently, always empty
+					ExportedService: serviceDef.ExportedService, // currently, always empty
 					Endpoints:       endpoints,
+				}
+
+				if attachedClusterName != "" {
+					s.Hostnames.BdvlibRefKey = append(
+						[]string{"attachments", "clusters", attachedClusterName},
+						s.Hostnames.BdvlibRefKey...,
+					)
+					s.FQDNs.BdvlibRefKey = append(
+						[]string{"attachments", "clusters", attachedClusterName},
+						s.FQDNs.BdvlibRefKey...,
+					)
 				}
 				result[serviceDef.ID] = s
 			}
@@ -114,6 +136,60 @@ func servicesForRole(
 	}
 
 	return result
+}
+
+// clusterAtachments generates a map of running clusters that are to be attached
+// to this cluster.
+func clusterAttachments(
+	cr *kdv1.KubeDirectorCluster,
+) map[string]clusterAttachment {
+
+	clusters := make(map[string]clusterAttachment)
+	for _, clusterName := range cr.Spec.Attachments.Clusters {
+		// Fetch the cluster object
+		attachedCR, attachedCRErr := observer.GetCluster(cr.Namespace, clusterName)
+		attachedApp, attachedAppErr := observer.GetApp(attachedCR.Spec.AppID)
+		if attachedCRErr != nil || attachedAppErr != nil {
+			continue
+		}
+
+		domain := attachedCR.Status.ClusterService + "." + attachedCR.Namespace + shared.DomainBase
+
+		membersForRole := make(map[string][]*kdv1.MemberStatus)
+		for _, roleInfo := range attachedCR.Status.Roles {
+			var membersStatus []*kdv1.MemberStatus
+			for _, members := range roleInfo.Members {
+				membersStatus = append(
+					membersStatus,
+					&members,
+				)
+			}
+			membersForRole[roleInfo.Name] = membersStatus
+		}
+
+		clusters[clusterName] = clusterAttachment{
+			Version:    strconv.Itoa(attachedApp.Spec.SchemaVersion),
+			Services:   getServices(attachedApp, membersForRole, clusterName),
+			Nodegroups: nodegroups(attachedCR, attachedApp, membersForRole, domain, clusterName),
+			Distros: map[string]refkeysMap{
+				attachedApp.Spec.DistroID: refkeysMap{
+					"1": refkeys{
+						BdvlibRefKey: []string{"attachments", "clusters", clusterName, "nodegroups", "1"},
+					},
+				},
+			},
+			Name:     attachedCR.Name,
+			Isolated: false, // currently, always false
+			ID:       string(cr.UID),
+			ConfigMeta: map[string]refkeys{
+				"1": refkeys{
+					BdvlibRefKey: []string{"attachments", "clusters", clusterName, "nodegroups", "1", "config_metadata"},
+				},
+			},
+		}
+	}
+
+	return clusters
 }
 
 // nodegroups generates a map of nodegroup ID to internal nodegroup
@@ -125,6 +201,7 @@ func nodegroups(
 	appCR *kdv1.KubeDirectorApp,
 	membersForRole map[string][]*kdv1.MemberStatus,
 	domain string,
+	attachedClusterName string,
 ) map[string]nodegroup {
 
 	roles := make(map[string]role)
@@ -157,7 +234,7 @@ func nodegroups(
 			Cores:       strconv.FormatInt(coresQuant.Value(), 10), // rounds up
 		}
 		roles[roleName] = role{
-			Services:     servicesForRole(appCR, roleName, members),
+			Services:     servicesForRole(appCR, roleName, members, attachedClusterName, domain),
 			NodeIDs:      nodeIds,
 			Hostnames:    fqdns,
 			FQDNs:        fqdns,
@@ -186,8 +263,8 @@ func clusterBaseConfig(
 
 	return &configmeta{
 		Version:    strconv.Itoa(appCR.Spec.SchemaVersion),
-		Services:   getServices(appCR, membersForRole),
-		Nodegroups: nodegroups(cr, appCR, membersForRole, domain),
+		Services:   getServices(appCR, membersForRole, ""),
+		Nodegroups: nodegroups(cr, appCR, membersForRole, domain, ""),
 		Distros: map[string]refkeysMap{
 			appCR.Spec.DistroID: refkeysMap{
 				"1": refkeys{
@@ -204,6 +281,9 @@ func clusterBaseConfig(
 					BdvlibRefKey: []string{"nodegroups", "1", "config_metadata"},
 				},
 			},
+		},
+		Attachments: attachments{
+			Clusters: clusterAttachments(cr),
 		},
 	}
 }

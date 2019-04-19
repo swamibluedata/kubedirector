@@ -1,0 +1,34 @@
+apiVersion: "kubedirector.bluedata.io/v1alpha1"
+kind: "KubeDirectorCluster"
+metadata:
+  name: "python-ml"
+spec:
+  app: python-ml
+  roles:
+  - id: worker
+    members: 2
+    resources:
+      requests:
+        memory: "4Gi"
+        cpu: "1"
+      limits:
+        memory: "4Gi"
+        cpu: "1"
+  - id: reqhandler
+    members: 1
+    resources:
+      requests:
+        memory: "4Gi"
+        cpu: "1"
+      limits:
+        memory: "4Gi"
+        cpu: "1"
+  - id: gunicorn
+    members: 2
+    resources:
+      requests:
+        memory: "4Gi"
+        cpu: "1"
+      limits:
+        memory: "4Gi"
+        cpu: "1"

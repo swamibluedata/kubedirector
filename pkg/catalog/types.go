@@ -19,12 +19,13 @@ package catalog
 // CR. It is arranged in a format to be consumed by the app setup Python
 // packages.
 type configmeta struct {
-	Version    string                  `json:"version"`
-	Services   map[string]ngRefkeysMap `json:"services"`
-	Nodegroups map[string]nodegroup    `json:"nodegroups"`
-	Distros    map[string]refkeysMap   `json:"distros"`
-	Cluster    cluster                 `json:"cluster"`
-	Node       *node                   `json:"node"`
+	Version     string                  `json:"version"`
+	Services    map[string]ngRefkeysMap `json:"services"`
+	Nodegroups  map[string]nodegroup    `json:"nodegroups"`
+	Distros     map[string]refkeysMap   `json:"distros"`
+	Cluster     cluster                 `json:"cluster"`
+	Node        *node                   `json:"node"`
+	Attachments attachments             `json:"attachments"`
 }
 
 type ngRefkeysMap map[string]refkeysMap
@@ -40,6 +41,27 @@ type nodegroup struct {
 	DistroID            string            `json:"distro_id"`
 	CatalogEntryVersion string            `json:"catalog_entry_version"`
 	ConfigMeta          map[string]string `json:"config_metadata"`
+}
+
+type attachments struct {
+	Clusters map[string]clusterAttachment `json:"clusters"`
+	Models   map[string]model             `json:"models"`
+}
+
+type model struct {
+	NotUsed string `json:"not_used"`
+}
+
+type clusterAttachment struct {
+	Version    string                  `json:"version"`
+	Services   map[string]ngRefkeysMap `json:"services"`
+	Nodegroups map[string]nodegroup    `json:"nodegroups"`
+	Distros    map[string]refkeysMap   `json:"distros"`
+	Cluster    cluster                 `json:"cluster"`
+	Name       string                  `json:"name"`
+	Isolated   bool                    `json:"isolated"`
+	ID         string                  `json:"id"`
+	ConfigMeta map[string]refkeys      `json:"config_metadata"`
 }
 
 type cluster struct {

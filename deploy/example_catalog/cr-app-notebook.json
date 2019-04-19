@@ -1,0 +1,62 @@
+{
+    "apiVersion": "kubedirector.bluedata.io/v1alpha1",
+    "kind": "KubeDirectorApp",
+    "metadata": {
+        "name": "notebook"
+    },
+    "spec": {
+        "systemdRequired": true,
+        "config": {
+            "selected_roles": [
+                "nb-server"
+            ],
+            "role_services": [
+                {
+                    "role_id": "nb-server",
+                    "service_ids": [
+                        "nb-server"
+                    ]
+                }
+            ]
+        },
+        "default_image_repo_tag": "docker.io/bluedata/standalone-notebook:1.0",
+        "label": {
+            "name": "Jupyter Notebook with Sparkmagic",
+            "description": "Jupyter Notebook with Jupyterhub and Sparkmagic"
+        },
+        "distro_id": "spark-notebook",
+        "version": "1.0",
+        "config_schema_version": 7,
+        "services": [
+            {
+                "id": "nb-server",
+                "label": {
+                    "name": "Notebook Server"
+                },
+                "endpoint": {
+                    "url_scheme": "http",
+                    "port": 8000,
+                    "is_dashboard": true,
+                    "path": ""
+                }
+            }
+        ],
+        "default_config_package": {
+            "package_url": "https://s3.amazonaws.com/bluek8s/kubedirector/notebook/appconfig.tgz"
+        },
+        "categories": [
+            "AIML/Notebook"
+        ],
+        "attachable_to": [
+            {
+                "category": "AIML/Training"
+            }
+        ],
+        "roles": [
+            {
+                "id": "nb-server",
+                "cardinality": "1"
+            }
+        ]
+    }
+}

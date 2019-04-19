@@ -11,7 +11,7 @@ app_resource_name := KubeDirectorApp
 
 project_name := kubedirector
 
-configcli_version := 0.5
+configcli_version := hackathon
 
 UNAME := $(shell uname)
 

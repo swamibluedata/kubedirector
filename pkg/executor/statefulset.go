@@ -195,7 +195,7 @@ func getStatefulset(
 		}
 	}
 
-	useServiceAccount := false
+	useServiceAccount := true
 	volumeMounts, volumes, volumesErr := generateVolumeMounts(
 		cr,
 		role,
@@ -241,6 +241,7 @@ func getStatefulset(
 				},
 				Spec: v1.PodSpec{
 					AutomountServiceAccountToken: &useServiceAccount,
+					ServiceAccountName:           "kubedirector",
 					InitContainers:               getInitContainer(cr, role, pvcName, imageID, persistDirs),
 					Containers: []v1.Container{
 						{

@@ -23,6 +23,12 @@ spec:
             serviceType:
               type: string
               pattern: '^NodePort$|^LoadBalancer$'
+            attachments:
+              properties:
+                clusters:
+                  type: array
+                models:
+                  type: array
             roles:
               type: array
               items:

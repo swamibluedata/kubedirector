@@ -47,9 +47,10 @@ type KubeDirectorCluster struct {
 // LoadBalancer services. The Roles field describes the requested cluster roles,
 // each of which will be implemented (by KubeDirector) using a StatefulSet.
 type ClusterSpec struct {
-	AppID       string  `json:"app"`
-	ServiceType *string `json:"serviceType"`
-	Roles       []Role  `json:"roles"`
+	AppID       string      `json:"app"`
+	ServiceType *string     `json:"serviceType"`
+	Roles       []Role      `json:"roles"`
+	Attachments Attachments `json:"attachments"`
 }
 
 // EnvVar specifies environment variables for the start script in a
@@ -104,6 +105,13 @@ type MemberStatus struct {
 	NodeID  int64  `json:"node_id"`
 }
 
+// Attachments specifies list of cluster objects and model objects that has
+// be attached to the cluster.
+type Attachments struct {
+	Clusters []string `json:"clusters,omitempty"`
+	Models   []string `json:"models,omitempty"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // KubeDirectorAppList is the top-level list type for app definition CRs.
@@ -126,18 +134,27 @@ type KubeDirectorApp struct {
 
 // AppSpec is the spec provided for an app definition.
 type AppSpec struct {
-	Label               Label           `json:"label"`
-	DistroID            string          `json:"distro_id"`
-	Version             string          `json:"version"`
-	SchemaVersion       int             `json:"schema_version"`
-	DefaultImageRepoTag *string         `json:"default_image_repo_tag,omitempty"`
-	DefaultSetupPackage SetupPackage    `json:"default_config_package,omitempty"`
-	Services            []Service       `json:"services"`
-	NodeRoles           []NodeRole      `json:"roles"`
-	Config              NodeGroupConfig `json:"config"`
-	DefaultPersistDirs  *[]string       `json:"default_persist_dirs"`
-	Capabilities        []v1.Capability `json:"capabilities"`
-	SystemdRequired     bool            `json:"systemdRequired"`
+	Label               Label              `json:"label"`
+	DistroID            string             `json:"distro_id"`
+	Version             string             `json:"version"`
+	SchemaVersion       int                `json:"schema_version"`
+	DefaultImageRepoTag *string            `json:"default_image_repo_tag,omitempty"`
+	DefaultSetupPackage SetupPackage       `json:"default_config_package,omitempty"`
+	Services            []Service          `json:"services"`
+	NodeRoles           []NodeRole         `json:"roles"`
+	Config              NodeGroupConfig    `json:"config"`
+	DefaultPersistDirs  *[]string          `json:"default_persist_dirs"`
+	Capabilities        []v1.Capability    `json:"capabilities"`
+	SystemdRequired     bool               `json:"systemdRequired"`
+	Categories          []string           `json:"categories,omitempty"`
+	AttachableTo        []AttachableConfig `json:"attachable_to,omitempty"`
+}
+
+// AttachableConfig describes type of objects that can be attached to
+// a cluster that uses the app.
+// XXX FIXME. Only categor
+type AttachableConfig struct {
+	Category string `json:"category"`
 }
 
 // Label is a short name and long description for the app definition.
@@ -164,9 +181,10 @@ type SetupPackageURL struct {
 // access, and/or identified for other use by API clients or consumers
 // internal to the virtual cluster (e.g. app setup packages).
 type Service struct {
-	ID       string          `json:"id"`
-	Label    Label           `json:"label,omitempty"`
-	Endpoint ServiceEndpoint `json:"endpoint,omitempty"`
+	ID              string          `json:"id"`
+	Label           Label           `json:"label,omitempty"`
+	Endpoint        ServiceEndpoint `json:"endpoint,omitempty"`
+	ExportedService string          `json:"exported_service,omitempty"`
 }
 
 // ServiceEndpoint describes the service network address and protocol, and
